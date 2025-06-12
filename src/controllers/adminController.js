@@ -1,5 +1,5 @@
 import validator from "validator";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 // import adminModel from "../models/adminModal.js";
 import jwt from 'jsonwebtoken';
 import adminModel from "../models/admin/adminModel.js";
