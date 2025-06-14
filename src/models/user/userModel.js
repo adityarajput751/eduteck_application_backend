@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema({
     zip: { type: String },
     country: { type: String },
   },
-  access_token: { type: String, required: true },
+  access_token: { type: String, required: false },
   refresh_token: { type: String, default: null },
   last_login: { type: Date, default: null },
 });
