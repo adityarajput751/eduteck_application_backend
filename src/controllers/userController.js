@@ -8,33 +8,42 @@ import Otp from "../models/user/otpModel.js";
 dotenv.config();
 const generateOTP = () => Math.floor(1000 + Math.random() * 9000).toString();
 
-
 const sendOtp = async (req, res) => {
     try {
-        const { email, first_name, last_name, password, user_type, ...extraFields } = req.body;
+        const { email, username, first_name, last_name, password, user_type, ...extraFields } = req.body;
 
-        if (!email || !validator.isEmail(email)) {
-            return res.status(400).json({ success: false, message: "Valid email is required" });
+        // If both email and username are missing
+        if (!email && !username) {
+            return res.status(400).json({ success: false, message: "Email or Username is required" });
         }
 
         const invalidKeys = Object.keys(extraFields);
         if (invalidKeys.length > 0) {
-            return res.status(400).json({ success: false, message: `Invalid data` });
+            return res.status(400).json({ success: false, message: "Invalid data" });
         }
 
-        const otp = generateOTP(); // e.g. 4-digit or 6-digit string
-        const user = await User.findOne({ email });
+        const otp = generateOTP();
+        let user = null;
 
-        // 🔹 Case 1: Only email provided
+        // Find user by email or username
+        if (email) {
+            if (!validator.isEmail(email)) {
+                return res.status(400).json({ success: false, message: "Invalid email format" });
+            }
+            user = await User.findOne({ email });
+        } else if (username) {
+            user = await User.findOne({ username });
+        }
+
+        // ✅ Case 1: Only email or username provided
         if (!first_name && !last_name && !password && !user_type) {
             if (user) {
-                // Save OTP in Otp collection
-                await Otp.create({ email, otp });
+                await Otp.create({ email: user.email, otp });
 
                 return res.status(200).json({
                     success: true,
                     message: "OTP has been generated for existing user",
-                    otp, // For testing; remove in production
+                    otp, // for testing; remove in production
                     user_id: user.id
                 });
             } else {
@@ -45,29 +54,33 @@ const sendOtp = async (req, res) => {
             }
         }
 
-        // 🔹 Case 2: Full payload provided, but user already exists
-        if (user) {
+        // ✅ Case 2: Full registration with email/username already taken
+        const emailExists = email ? await User.findOne({ email }) : null;
+        const usernameExists = username ? await User.findOne({ username }) : null;
+
+        if (emailExists) {
+            return res.status(400).json({ success: false, message: "Email already exists" });
+        }
+
+        if (usernameExists) {
+            return res.status(400).json({ success: false, message: "Username already exists" });
+        }
+
+        // ✅ Case 3: Register new user
+        if (!first_name || !last_name || !password || !user_type || !username || !email) {
             return res.status(400).json({
                 success: false,
-                message: "User already exists"
+                message: "Missing required fields: first_name, last_name, email, username, password, or user_type"
             });
         }
 
-        // Validate all required fields
-        if (!first_name || !last_name || !password || !user_type) {
-            return res.status(400).json({
-                success: false,
-                message: "Missing required fields: first_name, last_name, password, or user_type"
-            });
-        }
-
-        // Create user and generate OTP
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const newUser = new User({
             id: Date.now().toString(),
             first_name,
             last_name,
+            username,
             email,
             user_type,
             password: hashedPassword,
@@ -76,24 +89,22 @@ const sendOtp = async (req, res) => {
             updated_at: new Date()
         });
 
-        console.log(newUser, 'newUsernewUserv')
-
         await newUser.save();
-
-        await Otp.create({ email, otp }); // Save OTP
+        await Otp.create({ email, otp });
 
         return res.status(200).json({
             success: true,
             message: "OTP has been generated and new user created",
-            otp, // For testing; remove in production
+            otp,
             user_id: newUser.id
         });
 
     } catch (err) {
         console.error("Error in sendOtp:", err.message);
-        res.status(500).json({ success: false, message: "Internal Server Error" });
+        return res.status(500).json({ success: false, message: "Internal Server Error" });
     }
 };
+
 
 
 const generateAccessToken = (user) => {

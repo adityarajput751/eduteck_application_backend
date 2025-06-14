@@ -33,6 +33,7 @@ const userSchema = new mongoose.Schema({
   access_token: { type: String, required: false },
   refresh_token: { type: String, default: null },
   last_login: { type: Date, default: null },
+  username: {type: String, required: true, unique: true}
 });
 
 const User = mongoose.models.User || mongoose.model("User", userSchema);
